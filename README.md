@@ -56,7 +56,7 @@ val mappedStore = subStore.map(Lens(
                        ),
                        state = User(
                                firstName = mappedState.displayName.split(" ")[0],
-                               lastName = mappedState.displayName.split(" ")[0]
+                               lastName = mappedState.displayName.split(" ")[1]
                        )
                )
            }
