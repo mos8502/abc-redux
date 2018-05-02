@@ -70,16 +70,16 @@ And finally you can create a "reducer store" to be able to mutate your state thr
 sealed class Action {
    data class SetUsername(val username: String): Action()
    data class SetPassword(val password: String): Action()
-  
-   fun reducer(state: LoggedInUser, action: Action): LoggedInUser {
-       when(action) {
-           is SetUsername -> state.copy(username = action.username)
-           is SetPassword -> state.copy(password = action.password)
-       }
-   }
-  
-   val reducerStore = mappedStore.withReducer(::reducer)
 }
+
+fun reducer(state: LoggedInUser, action: Action): LoggedInUser {
+    return when(action) {
+        is SetUsername -> state.copy(username = action.username)
+        is SetPassword -> state.copy(password = action.password)
+    }
+}
+   
+val reducerStore = mappedStore.withReducer(::reducer)
 
 ```
 
