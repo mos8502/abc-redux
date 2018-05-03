@@ -17,7 +17,7 @@ data class Credentials(val username: String = "", password: String = "") {
    val isLoggedIn = !username.isEmpty() && !password.isEmpty()
 }
 
-val rootStore = StateStpre(Credentials())
+val rootStore = StateStore(Credentials())
 
 ```
 A ```StateStore``` is the simplest store that allows actions of type ```(S) -> S``` to be dispatched to the store to mutate state. The state can in turn be observed by subscibing to the store
