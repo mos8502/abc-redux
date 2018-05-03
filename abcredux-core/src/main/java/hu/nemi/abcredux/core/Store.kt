@@ -154,7 +154,7 @@ private class RootStateStore<R : Any>(initialState: R, private val lock: Lock) {
     @Volatile
     private var isDispatching = false
 
-    fun dispatch(action: (StateNode<R>) -> StateNode<R>) {
+    fun dispatch(action: (StateNode<R>) -> StateNode<R>) = lock {
         if (isDispatching) throw IllegalStateException("an action is already being dispatched")
 
         isDispatching = true
