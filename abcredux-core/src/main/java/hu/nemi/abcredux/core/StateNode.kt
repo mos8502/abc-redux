@@ -7,42 +7,59 @@ data class State<out P : Any, out S : Any>(val parentState: P, val state: S)
 
 internal data class StateNode<out V : Any>(val value: V, val children: Map<Any, StateNode<*>> = emptyMap())
 
-internal interface StateNodeRef<R : Any, V : Any> {
-    val node: Lens<StateNode<R>, StateNode<V>>
-
+internal interface StateRef<R : Any, V : Any> {
     val value: Lens<StateNode<R>, V>
-        get() = node + Lens(
-                get = { it.value },
-                set = { value -> { node -> node.copy(value = value) } }
-        )
 
-    fun <C : Any> addChild(key: Any, init: () -> C): StateNodeRef<R, C>
+    operator fun <T : Any> plus(lens: Lens<V, T>): StateRef<R, T>
+
+    operator fun <T : Any> plus(other: StateRef<R, T>): StateRef<R, Pair<V, T>> = StateRef(Lens(
+            get = { value(it) to other.value(it) },
+            set = { pair -> { node -> other.value(value(node, pair.first), pair.second) } }
+    ))
 
     companion object {
-        operator fun <R : Any> invoke(): StateNodeRef<R, R> = RootStateNodeRef()
+        operator fun <R : Any, V : Any> invoke(value: Lens<StateNode<R>, V>): StateRef<R, V> = object : StateRef<R, V> {
+            override val value: Lens<StateNode<R>, V> = value
+
+            override fun <T : Any> plus(lens: Lens<V, T>): StateRef<R, T> = StateRef(value + lens)
+
+        }
     }
 }
 
-private class RootStateNodeRef<R : Any> : StateNodeRef<R, R> {
-    override val node: Lens<StateNode<R>, StateNode<R>> = Lens(
-            get = { it },
-            set = { newNode -> { _ -> newNode } }
-    )
+internal interface MutableStateRef<R : Any, V : Any> : StateRef<R, V> {
+    fun <C : Any> addChild(key: Any, init: () -> C): MutableStateRef<R, State<V, C>>
 
-    override fun <C : Any> addChild(key: Any, init: () -> C): StateNodeRef<R, C> =
-            ChildStateNodeRef(key = key, parent = this, init = init)
+    override operator fun <T : Any> plus(lens: Lens<V, T>): MutableStateRef<R, T>
+
+    companion object {
+        operator fun <R : Any, V : Any> invoke(nodeLens: Lens<StateNode<R>, StateNode<V>>): MutableStateRef<R, V> = object : MutableStateRef<R, V> {
+            override val value: Lens<StateNode<R>, V> = nodeLens + Lens(
+                    get = { it.value },
+                    set = { value -> { node -> node.copy(value = value) } }
+            )
+
+            override fun <C : Any> addChild(key: Any, init: () -> C): MutableStateRef<R, State<V, C>> = MutableStateRef(
+                    nodeLens + Lens(
+                            get = {
+                                val childNode = (it.children[key] as? StateNode<C>) ?: StateNode(value = init())
+                                StateNode(value = State(parentState = it.value, state = childNode.value), children = childNode.children)
+                            },
+                            set = { childNode ->
+                                { parentNode ->
+                                    parentNode.copy(value = childNode.value.parentState, children = parentNode.children + (key to StateNode(value = childNode.value.state, children = childNode.children)))
+                                }
+
+                            }
+                    )
+            )
+
+            override fun <T : Any> plus(lens: Lens<V, T>): MutableStateRef<R, T> = MutableStateRef(
+                    nodeLens + Lens(
+                            get = { node: StateNode<V> -> StateNode(value = lens(node.value), children = node.children) },
+                            set = { mappedNode: StateNode<T> -> { node: StateNode<V> -> node.copy(value = lens(node.value, mappedNode.value), children = mappedNode.children) } }
+                    )
+            )
+        }
+    }
 }
-
-private class ChildStateNodeRef<R : Any, V : Any, P : Any>(val key: Any, val parent: StateNodeRef<R, P>, val init: () -> V) : StateNodeRef<R, V> {
-    override val node: Lens<StateNode<R>, StateNode<V>> = parent.node + Lens(
-            get = {
-                it.children[key] as? StateNode<V>
-                        ?: StateNode(value = init())
-            },
-            set = { node -> { parent -> parent.copy(children = parent.children + (key to node)) } }
-    )
-
-    override fun <C : Any> addChild(key: Any, init: () -> C): StateNodeRef<R, C> =
-            ChildStateNodeRef(key = key, parent = this, init = init)
-}
-

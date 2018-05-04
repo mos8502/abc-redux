@@ -212,6 +212,19 @@ class StateStoreTest {
         mappedStore.subscribe(mappedSubscriber)
         verify(subscriber)(expected)
         verify(mappedSubscriber)(flatten(expected))
+    }
 
+    @Test
+    fun `can zip stores`() {
+        val firstMap = Lens<State<Int, String>, String>(get = { it.state }, set = { mapped -> { state -> state.copy(state = mapped) } })
+        val secondMap = Lens<State<Int, Long>, Long>(get = { it.state }, set = { mapped -> { state -> state.copy(state = mapped) } })
+        val rootStore = StateStore(23)
+        val firstStore = rootStore.subState("first") { "string" } map firstMap
+        val secondStore = rootStore.subState("second") { 1L } map secondMap
+        val zipped = firstStore.zip(secondStore)
+        val subscriber: (Pair<String, Long>) -> Unit = mock()
+
+        zipped.subscribe(subscriber)
+        verify(subscriber)(Pair("string", 1L))
     }
 }

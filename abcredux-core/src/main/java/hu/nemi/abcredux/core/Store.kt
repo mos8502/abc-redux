@@ -82,30 +82,29 @@ interface Middleware<in S, A> {
 interface StateStore<S : Any> : Store<S, (S) -> S> {
 
     /**
-     * Create a sub state from this store.
+     * Create a reducer store which allows to mappedBy state through a reducer function based on the messages dispatched to the store
      *
-     * @param key an arbitrary unique key for the sub state
-     * @param init initializer function for the state node
-     * @return a [Store<State<S, C>>] that represents both the parent [S] and the child state as a pair]
-     */
-    fun <C : Any> subState(key: Any, init: () -> C): StateStore<State<S, C>>
-
-    /**
-     * Map the state represented by this store by a lens. Mapping allows to reshape the state represented by this store
-     *
-     * @param lens for mapping state
-     * @return mapped state store of type [StateStore<T>]
-     */
-    fun <T : Any> map(lens: Lens<S, T>): StateStore<T>
-
-    /**
-     * Create a reducer store which allows to map state through a reducer function based on the messages dispatched to the store
-     *
-     * @param reducer a function if type <(S, A) -> S> to map the state based on the current state and the action dispatched
+     * @param reducer a function if type <(S, A) -> S> to mappedBy the state based on the current state and the action dispatched
      * @param middleware any number of middlewares to associated with the reducer store
      * @return reducer store
      */
     fun <A : Any> withReducer(reducer: (S, A) -> S, middleware: Iterable<Middleware<S, A>> = emptyList()): Store<S, A>
+
+    /**
+     * Zips two stores resulting in an [ImmutableStateStore<Pair<S, T>>]. Zipping doesn't result in a new state node and as such cannot have a sub state
+     *
+     * @param other the store to zip with
+     * @return the zipped store
+     */
+    fun <T : Any> zip(other: ImmutableStateStore<T>): ImmutableStateStore<Pair<S, T>>
+
+    /**
+     * Zips two stores resulting in an [ImmutableStateStore<Pair<S, T>>]. Zipping doesn't result in a new state node and as such cannot have a sub state
+     *
+     * @param other the store to zip with
+     * @return the zipped store
+     */
+    fun <T : Any> zip(other: MutableStateStore<T>): ImmutableStateStore<Pair<S, T>>
 
     companion object {
         /**
@@ -114,16 +113,19 @@ interface StateStore<S : Any> : Store<S, (S) -> S> {
          * @param initialState the initial state of the root state store
          * @return [StateStore<S>]
          */
-        operator fun <S : Any> invoke(initialState: S): StateStore<S> =
-                DefaultStateStore(
-                        rootStateStore = RootStateStore(initialState, Lock()),
-                        parentState = Lens(),
-                        node = StateNodeRef<S>(),
-                        lens = Lens(
-                                get = { it.state },
-                                set = { state -> { rootNode -> rootNode.copy(state = state) } }
-                        ))
+        operator fun <S : Any> invoke(initialState: S): MutableStateStore<S> =
+                DefaultMutableStateStore(rootStateStore = RootStateStore(initialState, Lock()), node = MutableStateRef<S, S>(Lens()))
     }
+}
+
+interface ImmutableStateStore<S : Any> : StateStore<S> {
+    infix fun <T : Any> map(lens: Lens<S, T>): ImmutableStateStore<T>
+}
+
+interface MutableStateStore<S : Any> : StateStore<S> {
+    infix fun <T : Any> map(lens: Lens<S, T>): MutableStateStore<T>
+
+    fun <C : Any> subState(key: Any, init: () -> C): MutableStateStore<State<S, C>>
 }
 
 private class MiddlewareDispatcher<in S : Any, A>(private val store: Dispatcher<A, Unit>,
@@ -190,64 +192,68 @@ private class RootStateStore<R : Any>(initialState: R, private val lock: Lock) {
     }
 }
 
-private class DefaultStateStore<R : Any, S : Any, P : Any, M : Any>(private val rootStateStore: RootStateStore<R>,
-                                                                    private val parentState: Lens<StateNode<R>, P>,
-                                                                    private val node: StateNodeRef<R, S>,
-                                                                    private val lens: Lens<State<P, S>, M>) : StateStore<M> {
-    private val state = Lens<StateNode<R>, State<P, S>>(
-            get = { State(parentState(it), node.value(it)) },
-            set = { state -> { rootNode -> node.value(parentState(rootNode, state.parentState), state.state) } }
-    ) + lens
-
-    override fun dispatch(action: (M) -> M) {
+private class DefaultStateStore<R : Any, S : Any>(private val rootStateStore: RootStateStore<R>,
+                                                  private val node: StateRef<R, S>) : StateStore<S> {
+    override fun dispatch(action: (S) -> S) {
         rootStateStore.dispatch { rootState ->
-            state(rootState, action(state(rootState)))
+            node.value(rootState, action(node.value(rootState)))
         }
     }
 
-    override fun dispatch(actionCreator: ActionCreator<M, (M) -> M>) {
+    override fun dispatch(actionCreator: ActionCreator<S, (S) -> S>) {
         rootStateStore.dispatch(object : ActionCreator<StateNode<R>, (StateNode<R>) -> StateNode<R>> {
             override fun invoke(state: StateNode<R>) =
-                    actionCreator(state(state))?.let { action ->
-                        { rootNode: StateNode<R> -> state(rootNode, action(state(rootNode))) }
+                    actionCreator(node.value(state))?.let { action ->
+                        { rootNode: StateNode<R> -> node.value(rootNode, action(node.value(rootNode))) }
                     }
         })
     }
 
-    override fun dispatch(asyncActionCreator: AsyncActionCreator<M, (M) -> M>) {
+    override fun dispatch(asyncActionCreator: AsyncActionCreator<S, (S) -> S>) {
         rootStateStore.dispatch(object : AsyncActionCreator<StateNode<R>, (StateNode<R>) -> StateNode<R>> {
             override fun invoke(state: StateNode<R>, dispatcher: (ActionCreator<StateNode<R>, (StateNode<R>) -> StateNode<R>>) -> Unit) {
-                asyncActionCreator(state(state)) { dispatch(it) }
+                asyncActionCreator(node.value(state)) { dispatch(it) }
             }
         })
     }
 
-    override fun <C : Any> subState(key: Any, init: () -> C): StateStore<State<M, C>> =
-            DefaultStateStore(
-                    rootStateStore = rootStateStore,
-                    node = node.addChild(key, init),
-                    parentState = state,
-                    lens = Lens())
-
-    override fun <T : Any> map(lens: Lens<M, T>): StateStore<T> =
-            DefaultStateStore(rootStateStore = rootStateStore,
-                    parentState = parentState,
-                    node = node,
-                    lens = this.lens + lens)
-
-    override fun <A : Any> withReducer(reducer: (M, A) -> M, middleware: Iterable<Middleware<M, A>>): Store<M, A> =
+    override fun <A : Any> withReducer(reducer: (S, A) -> S, middleware: Iterable<Middleware<S, A>>): Store<S, A> =
             ReducerStore(this, reducer, middleware)
 
-    override fun subscribe(block: (M) -> Unit): Subscription = rootStateStore.subscribe(Subscriber(block, state))
+    override fun subscribe(block: (S) -> Unit): Subscription = rootStateStore.subscribe(DefaultSubscriber(block, node.value))
 
-    private data class Subscriber<in R : Any, M : Any>(private val block: (M) -> Unit,
-                                                       private val state: Lens<StateNode<R>, M>) : (StateNode<R>) -> Unit {
-        override fun invoke(rootNode: StateNode<R>) = block(state(rootNode))
+    override fun <T : Any> zip(other: ImmutableStateStore<T>): ImmutableStateStore<Pair<S, T>> {
+        val otherStore = other as? DefaultImmutableStateStore<R, T> ?: throw IllegalArgumentException()
+        require(otherStore.rootStateStore == rootStateStore)
+        return DefaultImmutableStateStore(rootStateStore = rootStateStore, state = node + otherStore.state)
+    }
+
+    override fun <T : Any> zip(other: MutableStateStore<T>): ImmutableStateStore<Pair<S, T>> {
+        val otherStore = other as? DefaultMutableStateStore<R, T> ?: throw IllegalArgumentException()
+        require(otherStore.rootStateStore == rootStateStore)
+        return DefaultImmutableStateStore(rootStateStore = rootStateStore, state = node + otherStore.node)
     }
 }
 
+private class DefaultMutableStateStore<R : Any, S : Any>(val rootStateStore: RootStateStore<R>,
+                                                         val node: MutableStateRef<R, S>) : StateStore<S> by DefaultStateStore(rootStateStore, node), MutableStateStore<S> {
+
+    override fun <C : Any> subState(key: Any, init: () -> C): MutableStateStore<State<S, C>> =
+            DefaultMutableStateStore(
+                    rootStateStore = rootStateStore,
+                    node = node.addChild(key, init))
+
+    override fun <T : Any> map(lens: Lens<S, T>): MutableStateStore<T> = DefaultMutableStateStore(rootStateStore = rootStateStore, node = node + lens)
+}
+
+private class DefaultImmutableStateStore<R : Any, S : Any>(val rootStateStore: RootStateStore<R>,
+                                                           val state: StateRef<R, S>) : StateStore<S> by DefaultStateStore(rootStateStore, state), ImmutableStateStore<S> {
+
+    override fun <T : Any> map(lens: Lens<S, T>): ImmutableStateStore<T> = DefaultImmutableStateStore(rootStateStore = rootStateStore, state = state + lens)
+}
+
 private class ReducerStore<S : Any, in A : Any>(private val store: Store<S, (S) -> S>,
-                                                private val reducer: (S, A) -> S,
+                                                internal val reducer: (S, A) -> S,
                                                 middleware: Iterable<Middleware<S, A>>) : Store<S, A> {
     private val middlewareDispatcher = MiddlewareDispatcher(this, middleware).apply {
         subscribe(::onStateChanged)
@@ -278,4 +284,10 @@ private class ReducerStore<S : Any, in A : Any>(private val store: Store<S, (S) 
             }
         })
     }
+}
+
+private data class DefaultSubscriber<in R : Any, S : Any>(private val block: (S) -> Unit,
+                                                          private val get: Getter<StateNode<R>, S>) : (StateNode<R>) -> Unit {
+
+    override fun invoke(stateRoot: StateNode<R>) = block(get(stateRoot))
 }
