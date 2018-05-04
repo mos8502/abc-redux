@@ -138,14 +138,14 @@ class StateStoreTest {
         val childSubscriber: (String) -> Unit = mock()
         val childStore = store.subState("string") { "Hello, World!" }
                 .map(Lens(
-                        get = { it.state },
-                        set = { value: String -> { state: State<Int, String> -> state.copy(state = value) } }
+                        get = { it.second },
+                        set = { value: String -> { state: Pair<Int, String> -> state.copy(second = value) } }
                 ))
         val grandchildSubscriber: (Long) -> Unit = mock()
         val grandChildStore = childStore.subState("long") { -1L }
                 .map(Lens(
-                        get = { it.state },
-                        set = { value: Long -> { state: State<String, Long> -> state.copy(state = value) } }
+                        get = { it.second },
+                        set = { value: Long -> { state: Pair<String, Long> -> state.copy(second = value) } }
                 ))
 
         store.subscribe(subscriber)
@@ -168,32 +168,32 @@ class StateStoreTest {
 
     @Test
     fun `deep states`() {
-        data class First(val root: State<State<State<State<Int, String>, Int>, Long>, Unit>, val fifth: Pair<Int, Int>)
-        data class Second(val root: State<State<State<Int, String>, Int>, Long>, val fourth: Unit, val fifth: Pair<Int, Int>)
-        data class Third(val root: State<State<Int, String>, Int>, val third: Long, val fourth: Unit, val fifth: Pair<Int, Int>)
-        data class Fourth(val root: State<Int, String>, val second: Int, val third: Long, val fourth: Unit, val fifth: Pair<Int, Int>)
+        data class First(val root: Pair<Pair<Pair<Pair<Int, String>, Int>, Long>, Unit>, val fifth: Pair<Int, Int>)
+        data class Second(val root: Pair<Pair<Pair<Int, String>, Int>, Long>, val fourth: Unit, val fifth: Pair<Int, Int>)
+        data class Third(val root: Pair<Pair<Int, String>, Int>, val third: Long, val fourth: Unit, val fifth: Pair<Int, Int>)
+        data class Fourth(val root: Pair<Int, String>, val second: Int, val third: Long, val fourth: Unit, val fifth: Pair<Int, Int>)
         data class FlattenedState(val root: Int, val first: String, val second: Int, val third: Long, val fourth: Unit, val fifth: Pair<Int, Int>)
 
         val flatten =
-                Lens<State<State<State<State<State<Int, String>, Int>, Long>, Unit>, Pair<Int, Int>>, First>(
-                        get = { First(root = it.parentState, fifth = it.state) },
-                        set = { first -> { state -> state.copy(parentState = first.root) } }
+                Lens<Pair<Pair<Pair<Pair<Pair<Int, String>, Int>, Long>, Unit>, Pair<Int, Int>>, First>(
+                        get = { First(root = it.first, fifth = it.second) },
+                        set = { first -> { state -> state.copy(first = first.root) } }
                 ) +
                         Lens<First, Second>(
-                                get = { Second(root = it.root.parentState, fourth = it.root.state, fifth = it.fifth) },
-                                set = { second -> { first -> first.copy(root = State(second.root, second.fourth), fifth = second.fifth) } }
+                                get = { Second(root = it.root.first, fourth = it.root.second, fifth = it.fifth) },
+                                set = { second -> { first -> first.copy(root = Pair(second.root, second.fourth), fifth = second.fifth) } }
                         ) +
                         Lens<Second, Third>(
-                                get = { Third(root = it.root.parentState, third = it.root.state, fourth = it.fourth, fifth = it.fifth) },
-                                set = { third -> { second -> second.copy(root = State(third.root, third.third), fourth = third.fourth, fifth = third.fifth) } }
+                                get = { Third(root = it.root.first, third = it.root.second, fourth = it.fourth, fifth = it.fifth) },
+                                set = { third -> { second -> second.copy(root = Pair(third.root, third.third), fourth = third.fourth, fifth = third.fifth) } }
                         ) +
                         Lens<Third, Fourth>(
-                                get = { Fourth(root = it.root.parentState, second = it.root.state, third = it.third, fourth = it.fourth, fifth = it.fifth) },
-                                set = { fourth -> { third -> third.copy(root = State(fourth.root, fourth.second), third = fourth.third, fourth = fourth.fourth, fifth = fourth.fifth) } }
+                                get = { Fourth(root = it.root.first, second = it.root.second, third = it.third, fourth = it.fourth, fifth = it.fifth) },
+                                set = { fourth -> { third -> third.copy(root = Pair(fourth.root, fourth.second), third = fourth.third, fourth = fourth.fourth, fifth = fourth.fifth) } }
                         ) +
                         Lens<Fourth, FlattenedState>(
-                                get = { FlattenedState(root = it.root.parentState, first = it.root.state, second = it.second, third = it.third, fourth = it.fourth, fifth = it.fifth) },
-                                set = { state -> { fourth -> fourth.copy(root = State(state.root, state.first), second = state.second, third = state.third, fourth = state.fourth, fifth = state.fifth) } }
+                                get = { FlattenedState(root = it.root.first, first = it.root.second, second = it.second, third = it.third, fourth = it.fourth, fifth = it.fifth) },
+                                set = { state -> { fourth -> fourth.copy(root = Pair(state.root, state.first), second = state.second, third = state.third, fourth = state.fourth, fifth = state.fifth) } }
                         )
 
         val store = StateStore(23)
@@ -202,8 +202,8 @@ class StateStoreTest {
                 .subState("third") { 3L }
                 .subState(4) { Unit }
                 .subState(5L) { Pair(1, 2) }
-        val subscriber: (State<State<State<State<State<Int, String>, Int>, Long>, Unit>, Pair<Int, Int>>) -> Unit = mock()
-        val expected = State(State(State(State(State(23, "1"), 2), 3L), Unit), 1 to 2)
+        val subscriber: (Pair<Pair<Pair<Pair<Pair<Int, String>, Int>, Long>, Unit>, Pair<Int, Int>>) -> Unit = mock()
+        val expected = Pair(Pair(Pair(Pair(Pair(23, "1"), 2), 3L), Unit), 1 to 2)
 
         val mappedStore = store.map(flatten)
         val mappedSubscriber: (FlattenedState) -> Unit = mock()
@@ -216,8 +216,8 @@ class StateStoreTest {
 
     @Test
     fun `can zip stores`() {
-        val firstMap = Lens<State<Int, String>, String>(get = { it.state }, set = { mapped -> { state -> state.copy(state = mapped) } })
-        val secondMap = Lens<State<Int, Long>, Long>(get = { it.state }, set = { mapped -> { state -> state.copy(state = mapped) } })
+        val firstMap = Lens<Pair<Int, String>, String>(get = { it.second }, set = { mapped -> { state -> state.copy(second = mapped) } })
+        val secondMap = Lens<Pair<Int, Long>, Long>(get = { it.second }, set = { mapped -> { state -> state.copy(second = mapped) } })
         val rootStore = StateStore(23)
         val firstStore = rootStore.subState("first") { "string" } map firstMap
         val secondStore = rootStore.subState("second") { 1L } map secondMap

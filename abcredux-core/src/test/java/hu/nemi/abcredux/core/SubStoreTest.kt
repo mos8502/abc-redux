@@ -189,8 +189,8 @@ class SubStoreTest {
         val userReducer: (User, SetName) -> User = { user, setName -> user.copy(name = setName.name) }
         val userStore = basicAuthStore.subState("user") { "Player unknown" }
                 .map(Lens(
-                        get = { User(name = it.state, credentials = it.parentState) },
-                        set = { user: User -> { state: State<String, String> -> state.copy(parentState = user.credentials, state = user.name) } }
+                        get = { User(name = it.second, credentials = it.first) },
+                        set = { user: User -> { state: Pair<String, String> -> state.copy(first = user.credentials, second = user.name) } }
                 ))
                 .withReducer(userReducer)
 

@@ -125,7 +125,7 @@ interface ImmutableStateStore<S : Any> : StateStore<S> {
 interface MutableStateStore<S : Any> : StateStore<S> {
     infix fun <T : Any> map(lens: Lens<S, T>): MutableStateStore<T>
 
-    fun <C : Any> subState(key: Any, init: () -> C): MutableStateStore<State<S, C>>
+    fun <C : Any> subState(key: Any, init: () -> C): MutableStateStore<Pair<S, C>>
 }
 
 private class MiddlewareDispatcher<in S : Any, A>(private val store: Dispatcher<A, Unit>,
@@ -238,7 +238,7 @@ private class DefaultStateStore<R : Any, S : Any>(private val rootStateStore: Ro
 private class DefaultMutableStateStore<R : Any, S : Any>(val rootStateStore: RootStateStore<R>,
                                                          val node: MutableStateRef<R, S>) : StateStore<S> by DefaultStateStore(rootStateStore, node), MutableStateStore<S> {
 
-    override fun <C : Any> subState(key: Any, init: () -> C): MutableStateStore<State<S, C>> =
+    override fun <C : Any> subState(key: Any, init: () -> C): MutableStateStore<Pair<S, C>> =
             DefaultMutableStateStore(
                     rootStateStore = rootStateStore,
                     node = node.addChild(key, init))

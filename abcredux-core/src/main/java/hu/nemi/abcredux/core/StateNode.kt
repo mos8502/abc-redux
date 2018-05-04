@@ -1,10 +1,5 @@
 package hu.nemi.abcredux.core
 
-/**
- * Data class to represent a path from a node in the state tree to the root node
- */
-data class State<out P : Any, out S : Any>(val parentState: P, val state: S)
-
 internal data class StateNode<out V : Any>(val value: V, val children: Map<Any, StateNode<*>> = emptyMap())
 
 internal interface StateRef<R : Any, V : Any> {
@@ -28,7 +23,7 @@ internal interface StateRef<R : Any, V : Any> {
 }
 
 internal interface MutableStateRef<R : Any, V : Any> : StateRef<R, V> {
-    fun <C : Any> addChild(key: Any, init: () -> C): MutableStateRef<R, State<V, C>>
+    fun <C : Any> addChild(key: Any, init: () -> C): MutableStateRef<R, Pair<V, C>>
 
     override operator fun <T : Any> plus(lens: Lens<V, T>): MutableStateRef<R, T>
 
@@ -39,15 +34,15 @@ internal interface MutableStateRef<R : Any, V : Any> : StateRef<R, V> {
                     set = { value -> { node -> node.copy(value = value) } }
             )
 
-            override fun <C : Any> addChild(key: Any, init: () -> C): MutableStateRef<R, State<V, C>> = MutableStateRef(
+            override fun <C : Any> addChild(key: Any, init: () -> C): MutableStateRef<R, Pair<V, C>> = MutableStateRef(
                     nodeLens + Lens(
                             get = {
                                 val childNode = (it.children[key] as? StateNode<C>) ?: StateNode(value = init())
-                                StateNode(value = State(parentState = it.value, state = childNode.value), children = childNode.children)
+                                StateNode(value = Pair(first = it.value, second = childNode.value), children = childNode.children)
                             },
                             set = { childNode ->
                                 { parentNode ->
-                                    parentNode.copy(value = childNode.value.parentState, children = parentNode.children + (key to StateNode(value = childNode.value.state, children = childNode.children)))
+                                    parentNode.copy(value = childNode.value.first, children = parentNode.children + (key to StateNode(value = childNode.value.second, children = childNode.children)))
                                 }
 
                             }
