@@ -1,10 +1,5 @@
 package hu.nemi.abcredux.core
 
-/**
- * Data class to represent a path from a node in the state tree to the root node
- */
-data class State<out P : Any, out S : Any>(val parentState: P, val state: S)
-
 internal data class StateNode<out V : Any>(val value: V, val children: Map<Any, StateNode<*>> = emptyMap())
 
 internal interface StateNodeRef<R : Any, V : Any> {

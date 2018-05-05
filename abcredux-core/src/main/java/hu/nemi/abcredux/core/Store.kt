@@ -88,7 +88,7 @@ interface StateStore<S : Any> : Store<S, (S) -> S> {
      * @param init initializer function for the state node
      * @return a [Store<State<S, C>>] that represents both the parent [S] and the child state as a pair]
      */
-    fun <C : Any> subState(key: Any, init: () -> C): StateStore<State<S, C>>
+    fun <C : Any> subState(key: Any, init: () -> C): StateStore<Pair<S, C>>
 
     /**
      * Map the state represented by this store by a lens. Mapping allows to reshape the state represented by this store
@@ -120,8 +120,8 @@ interface StateStore<S : Any> : Store<S, (S) -> S> {
                         parentState = Lens(),
                         node = StateNodeRef<S>(),
                         lens = Lens(
-                                get = { it.state },
-                                set = { state -> { rootNode -> rootNode.copy(state = state) } }
+                                get = { it.second },
+                                set = { state -> { rootNode -> rootNode.copy(second = state) } }
                         ))
     }
 }
@@ -193,10 +193,10 @@ private class RootStateStore<R : Any>(initialState: R, private val lock: Lock) {
 private class DefaultStateStore<R : Any, S : Any, P : Any, M : Any>(private val rootStateStore: RootStateStore<R>,
                                                                     private val parentState: Lens<StateNode<R>, P>,
                                                                     private val node: StateNodeRef<R, S>,
-                                                                    private val lens: Lens<State<P, S>, M>) : StateStore<M> {
-    private val state = Lens<StateNode<R>, State<P, S>>(
-            get = { State(parentState(it), node.value(it)) },
-            set = { state -> { rootNode -> node.value(parentState(rootNode, state.parentState), state.state) } }
+                                                                    private val lens: Lens<Pair<P, S>, M>) : StateStore<M> {
+    private val state = Lens<StateNode<R>, Pair<P, S>>(
+            get = { Pair(parentState(it), node.value(it)) },
+            set = { state -> { rootNode -> node.value(parentState(rootNode, state.first), state.second) } }
     ) + lens
 
     override fun dispatch(action: (M) -> M) {
@@ -222,7 +222,7 @@ private class DefaultStateStore<R : Any, S : Any, P : Any, M : Any>(private val 
         })
     }
 
-    override fun <C : Any> subState(key: Any, init: () -> C): StateStore<State<M, C>> =
+    override fun <C : Any> subState(key: Any, init: () -> C): StateStore<Pair<M, C>> =
             DefaultStateStore(
                     rootStateStore = rootStateStore,
                     node = node.addChild(key, init),
