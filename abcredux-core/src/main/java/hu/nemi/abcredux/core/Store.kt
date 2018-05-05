@@ -117,12 +117,7 @@ interface StateStore<S : Any> : Store<S, (S) -> S> {
         operator fun <S : Any> invoke(initialState: S): StateStore<S> =
                 DefaultStateStore(
                         rootStateStore = RootStateStore(initialState, Lock()),
-                        parentState = Lens(),
-                        node = StateNodeRef<S>(),
-                        lens = Lens(
-                                get = { it.second },
-                                set = { state -> { rootNode -> rootNode.copy(second = state) } }
-                        ))
+                        node = StateNodeRef())
     }
 }
 
@@ -149,10 +144,8 @@ private class RootStateStore<R : Any>(initialState: R, private val lock: Lock) {
     private var state by Delegates.observable(StateNode(initialState)) { _, oldState, newState ->
         if (newState != oldState) subscriptions.keys.forEach { subscriber -> subscriber(newState) }
     }
-    @Volatile
-    private var subscriptions = emptyMap<(StateNode<R>) -> Unit, Subscription>()
-    @Volatile
-    private var isDispatching = false
+    @Volatile private var subscriptions = emptyMap<(StateNode<R>) -> Unit, Subscription>()
+    @Volatile private var isDispatching = false
 
     fun dispatch(action: (StateNode<R>) -> StateNode<R>) = lock {
         if (isDispatching) throw IllegalStateException("an action is already being dispatched")
@@ -190,55 +183,44 @@ private class RootStateStore<R : Any>(initialState: R, private val lock: Lock) {
     }
 }
 
-private class DefaultStateStore<R : Any, S : Any, P : Any, M : Any>(private val rootStateStore: RootStateStore<R>,
-                                                                    private val parentState: Lens<StateNode<R>, P>,
-                                                                    private val node: StateNodeRef<R, S>,
-                                                                    private val lens: Lens<Pair<P, S>, M>) : StateStore<M> {
-    private val state = Lens<StateNode<R>, Pair<P, S>>(
-            get = { Pair(parentState(it), node.value(it)) },
-            set = { state -> { rootNode -> node.value(parentState(rootNode, state.first), state.second) } }
-    ) + lens
-
-    override fun dispatch(action: (M) -> M) {
+private class DefaultStateStore<R : Any, S : Any>(private val rootStateStore: RootStateStore<R>,
+                                                  private val node: StateNodeRef<R, S>) : StateStore<S> {
+    override fun dispatch(action: (S) -> S) {
         rootStateStore.dispatch { rootState ->
-            state(rootState, action(state(rootState)))
+            node.value(rootState, action(node.value(rootState)))
         }
     }
 
-    override fun dispatch(actionCreator: ActionCreator<M, (M) -> M>) {
+    override fun dispatch(actionCreator: ActionCreator<S, (S) -> S>) {
         rootStateStore.dispatch(object : ActionCreator<StateNode<R>, (StateNode<R>) -> StateNode<R>> {
             override fun invoke(state: StateNode<R>) =
-                    actionCreator(state(state))?.let { action ->
-                        { rootNode: StateNode<R> -> state(rootNode, action(state(rootNode))) }
+                    actionCreator(node.value(state))?.let { action ->
+                        { rootNode: StateNode<R> -> node.value(rootNode, action(node.value(rootNode))) }
                     }
         })
     }
 
-    override fun dispatch(asyncActionCreator: AsyncActionCreator<M, (M) -> M>) {
+    override fun dispatch(asyncActionCreator: AsyncActionCreator<S, (S) -> S>) {
         rootStateStore.dispatch(object : AsyncActionCreator<StateNode<R>, (StateNode<R>) -> StateNode<R>> {
             override fun invoke(state: StateNode<R>, dispatcher: (ActionCreator<StateNode<R>, (StateNode<R>) -> StateNode<R>>) -> Unit) {
-                asyncActionCreator(state(state)) { dispatch(it) }
+                asyncActionCreator(node.value(state)) { dispatch(it) }
             }
         })
     }
 
-    override fun <C : Any> subState(key: Any, init: () -> C): StateStore<Pair<M, C>> =
+    override fun <C : Any> subState(key: Any, init: () -> C): StateStore<Pair<S, C>> =
             DefaultStateStore(
                     rootStateStore = rootStateStore,
-                    node = node.addChild(key, init),
-                    parentState = state,
-                    lens = Lens())
+                    node = node.addChild(key, init))
 
-    override fun <T : Any> map(lens: Lens<M, T>): StateStore<T> =
+    override fun <T : Any> map(lens: Lens<S, T>): StateStore<T> =
             DefaultStateStore(rootStateStore = rootStateStore,
-                    parentState = parentState,
-                    node = node,
-                    lens = this.lens + lens)
+                    node = node + lens)
 
-    override fun <A : Any> withReducer(reducer: (M, A) -> M, middleware: Iterable<Middleware<M, A>>): Store<M, A> =
+    override fun <A : Any> withReducer(reducer: (S, A) -> S, middleware: Iterable<Middleware<S, A>>): Store<S, A> =
             ReducerStore(this, reducer, middleware)
 
-    override fun subscribe(block: (M) -> Unit): Subscription = rootStateStore.subscribe(Subscriber(block, state))
+    override fun subscribe(block: (S) -> Unit): Subscription = rootStateStore.subscribe(Subscriber(block, node.value))
 
     private data class Subscriber<in R : Any, M : Any>(private val block: (M) -> Unit,
                                                        private val state: Lens<StateNode<R>, M>) : (StateNode<R>) -> Unit {
