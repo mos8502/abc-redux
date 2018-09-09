@@ -1,0 +1,46 @@
+apply plugin: 'com.android.library'
+apply plugin: "maven-publish"
+apply plugin: 'kotlin-android'
+
+android {
+    compileSdkVersion Versions.androidCompileSdk
+
+    defaultConfig {
+        minSdkVersion Versions.androidMinSdk
+        targetSdkVersion Versions.androidTargetSdk
+        versionCode 1
+        versionName "0.1"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+}
+
+dependencies {
+    compileOnly(Dependencies.liveData)
+    compileOnly project(":abcstore-core")
+
+    testImplementation(TestDependencies.junit)
+    androidTestImplementation(TestDependencies.androidTestRunner)
+    androidTestImplementation(TestDependencies.espressoCore)
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId 'hu.nemi.abcstore'
+            artifactId 'abcstore-android'
+            version '0.1-SNAPSHOT'
+            artifact("$buildDir/outputs/aar/abcstore-android-release.aar")
+
+        }
+    }
+}

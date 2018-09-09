@@ -1,0 +1,28 @@
+
+apply plugin: "maven-publish"
+apply plugin: "kotlin"
+
+group = "hu.nemi.abcstore"
+version = "0.1-SNAPSHOT"
+
+dependencies {
+    compileOnly(Dependencies.kotlinStdLib)
+
+    testImplementation(Dependencies.kotlinStdLib)
+    testImplementation(TestDependencies.junit)
+    testImplementation(TestDependencies.assertj)
+    testImplementation(TestDependencies.mockitoCore)
+    testImplementation(TestDependencies.mockitoKotlin)
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = "hu.nemi.abcstore"
+            artifactId = "abcstore-core"
+            version = "0.1-SNAPSHOT"
+            from components.java
+
+        }
+    }
+}

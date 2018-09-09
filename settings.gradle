@@ -1,2 +1,2 @@
-include ':abcredux-core'
+include ':abcstore-core', ':abcstore-android'
 

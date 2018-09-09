@@ -25,8 +25,7 @@ interface Lock {
 
 private class DefaultLock : Lock {
     private val accessingThread = AtomicLong(-1L)
-    @Volatile
-    private var accessCount = 0
+    @Volatile private var accessCount = 0
 
     override fun <R> invoke(block: () -> R): R {
         val threadId = Thread.currentThread().id

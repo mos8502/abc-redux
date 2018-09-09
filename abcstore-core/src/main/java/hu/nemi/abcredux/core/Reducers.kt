@@ -7,7 +7,7 @@ package hu.nemi.abcredux.core
  * @return the folded reducer function
  * @throws [IllegalArgumentException] if no functions are being passed
  */
-fun <S, A> fold(vararg reducers: (S, A) -> S): (S, A) -> S {
+fun <S: Any, A: Any> fold(vararg reducers: (S, A) -> S): (S, A) -> S {
     require(reducers.isNotEmpty()) { "no reducers passed" }
     return { state, action ->
         reducers.fold(state) { state, reducer ->
