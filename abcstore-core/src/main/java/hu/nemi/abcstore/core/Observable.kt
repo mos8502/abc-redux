@@ -1,4 +1,4 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 /**
  * Contract for subscriptions to an arbitrary source, allowing the the expression of the intent that the subscription is no longer required

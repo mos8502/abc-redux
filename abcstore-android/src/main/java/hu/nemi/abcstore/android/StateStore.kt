@@ -5,8 +5,8 @@ import android.arch.lifecycle.LifecycleObserver
 import android.arch.lifecycle.LifecycleOwner
 import android.arch.lifecycle.LiveData
 import android.arch.lifecycle.OnLifecycleEvent
-import hu.nemi.abcredux.core.Observable
-import hu.nemi.abcredux.core.Subscription
+import hu.nemi.abcstore.core.Observable
+import hu.nemi.abcstore.core.Subscription
 
 fun <S : Any> Observable<S>.subscribe(lifecycleOwner: LifecycleOwner, block: (S) -> Unit): Subscription {
     val observer = StateObserver(this, block)

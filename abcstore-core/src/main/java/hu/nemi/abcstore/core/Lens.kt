@@ -1,4 +1,4 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 /**
  * Optic for modifying immutable data structures. It implements [Getter] and [Setter] to be able to get and set a focus target if type [A] from object of type [S]

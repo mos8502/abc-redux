@@ -25,8 +25,8 @@ android {
 }
 
 dependencies {
-    compileOnly(Dependencies.liveData)
-    compileOnly project(":abcstore-core")
+    implementation(Dependencies.liveData)
+    implementation project(":abcstore-core")
 
     testImplementation(TestDependencies.junit)
     androidTestImplementation(TestDependencies.androidTestRunner)

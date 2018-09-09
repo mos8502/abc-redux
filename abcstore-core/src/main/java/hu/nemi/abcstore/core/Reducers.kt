@@ -1,4 +1,4 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 /**
  * Helper function to fold reducer functions of [(S, A) -> S] to a single reducer function of the same type

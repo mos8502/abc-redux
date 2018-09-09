@@ -1,4 +1,4 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 /**
  * Optic for setting or modifying a focus target

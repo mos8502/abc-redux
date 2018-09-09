@@ -1,4 +1,4 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 import kotlin.properties.Delegates
 

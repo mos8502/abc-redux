@@ -1,4 +1,4 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 import java.util.ConcurrentModificationException
 import java.util.concurrent.atomic.AtomicLong

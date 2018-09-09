@@ -1,4 +1,4 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 import org.junit.Test
 import org.assertj.core.api.Assertions.assertThat

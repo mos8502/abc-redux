@@ -1,4 +1,4 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 /**
  * Optic for getting the focus of the [Getter] from a structure

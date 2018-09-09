@@ -1,11 +1,10 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 import com.nhaarman.mockito_kotlin.inOrder
 import com.nhaarman.mockito_kotlin.mock
 import com.nhaarman.mockito_kotlin.verify
 import com.nhaarman.mockito_kotlin.verifyNoMoreInteractions
 import org.junit.Test
-import org.assertj.core.api.Assertions.assertThat
 
 class StateStoreTest {
 

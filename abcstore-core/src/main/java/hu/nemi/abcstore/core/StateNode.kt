@@ -1,4 +1,4 @@
-package hu.nemi.abcredux.core
+package hu.nemi.abcstore.core
 
 internal data class StateNode<out V : Any>(val value: V, val children: Map<Any, StateNode<*>> = emptyMap())
 
@@ -24,7 +24,8 @@ private data class DefaultStateNodeRef<R : Any, V : Any>(val nodeLens: Lens<Stat
     override fun <C : Any> addChild(key: Any, init: () -> C): StateNodeRef<R, Pair<V, C>> = DefaultStateNodeRef(
             nodeLens + Lens(
                     get = {
-                        val childNode = (it.children[key] as? StateNode<C>) ?: StateNode(value = init())
+                        val childNode = (it.children[key] as? StateNode<C>)
+                                ?: StateNode(value = init())
                         StateNode(value = Pair(first = it.value, second = childNode.value), children = childNode.children)
                     },
                     set = { childNode ->

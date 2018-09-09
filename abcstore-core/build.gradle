@@ -6,7 +6,7 @@ group = "hu.nemi.abcstore"
 version = "0.1-SNAPSHOT"
 
 dependencies {
-    compileOnly(Dependencies.kotlinStdLib)
+    implementation(Dependencies.kotlinStdLib)
 
     testImplementation(Dependencies.kotlinStdLib)
     testImplementation(TestDependencies.junit)
