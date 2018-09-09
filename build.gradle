@@ -9,3 +9,10 @@ buildscript {
         jcenter()
     }
 }
+
+allprojects {
+    repositories {
+        google()
+        jcenter()
+    }
+}
