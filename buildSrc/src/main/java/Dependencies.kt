@@ -9,6 +9,7 @@ object Versions {
     val espressoCore = "3.0.2"
     val androidTestRunner = "1.0.2"
     val androidGradlePlugin = "3.2.0-rc02"
+    val androidMavenPublish = "3.6.2"
     @JvmStatic val androidCompileSdk = 28
     @JvmStatic val androidMinSdk = 14
     @JvmStatic val androidTargetSdk = 28

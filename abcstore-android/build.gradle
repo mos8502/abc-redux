@@ -1,6 +1,9 @@
 apply plugin: 'com.android.library'
-apply plugin: "maven-publish"
 apply plugin: 'kotlin-android'
+apply plugin: 'digital.wup.android-maven-publish'
+
+group = "hu.nemi.abcstore"
+version = "0.1-SNAPSHOT"
 
 android {
     compileSdkVersion Versions.androidCompileSdk
@@ -35,12 +38,11 @@ dependencies {
 
 publishing {
     publications {
-        maven(MavenPublication) {
-            groupId 'hu.nemi.abcstore'
-            artifactId 'abcstore-android'
-            version '0.1-SNAPSHOT'
-            artifact("$buildDir/outputs/aar/abcstore-android-release.aar")
-
+        mavenAar(MavenPublication) {
+            groupId = "hu.nemi.abcstore"
+            artifactId = "abcstore-android"
+            version = "0.1-SNAPSHOT"
+            from components.android
         }
     }
 }
