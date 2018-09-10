@@ -1,9 +1,11 @@
-buildscript {
+buildscript { 
+    ext.kotlin_version = '1.2.60'
+
     dependencies {
         classpath "com.android.tools.build:gradle:${Versions.androidGradlePlugin}"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${Versions.kotlin}"
         classpath "digital.wup:android-maven-publish:${Versions.androidMavenPublish}"
-    }
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version" }
 
     repositories {
         google()

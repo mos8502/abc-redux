@@ -15,7 +15,7 @@ class StateStoreTest {
 
         store.subscribe(subscriber)
 
-        verify(subscriber).invoke(23)
+        verify(subscriber)(23)
         verifyNoMoreInteractions(subscriber)
     }
 
@@ -28,7 +28,7 @@ class StateStoreTest {
         subscription.unsubscribe()
         store.dispatch { it * 2 }
 
-        verify(subscriber).invoke(23)
+        verify(subscriber)(23)
         verifyNoMoreInteractions(subscriber)
     }
 
@@ -41,8 +41,8 @@ class StateStoreTest {
         store.dispatch { it * 2 }
 
         inOrder(subscriber) {
-            verify(subscriber).invoke(23)
-            verify(subscriber).invoke(46)
+            verify(subscriber)(23)
+            verify(subscriber)(46)
             verifyNoMoreInteractions(subscriber)
         }
     }
@@ -56,7 +56,7 @@ class StateStoreTest {
         store.dispatch { 23 }
 
         inOrder(subscriber) {
-            verify(subscriber).invoke(23)
+            verify(subscriber)(23)
             verifyNoMoreInteractions(subscriber)
         }
     }
@@ -87,12 +87,12 @@ class StateStoreTest {
         grandChildStore.dispatch { it + 23L }
 
         inOrder(subscriber, childSubscriber, grandchildSubscriber) {
-            verify(subscriber).invoke(23)
-            verify(childSubscriber).invoke("Hello, World!")
-            verify(grandchildSubscriber).invoke(-1L)
-            verify(subscriber).invoke(46)
-            verify(childSubscriber).invoke("Goodbye, World!")
-            verify(grandchildSubscriber).invoke(22L)
+            verify(subscriber)(23)
+            verify(childSubscriber)("Hello, World!")
+            verify(grandchildSubscriber)(-1L)
+            verify(subscriber)(46)
+            verify(childSubscriber)("Goodbye, World!")
+            verify(grandchildSubscriber)(22L)
         }
     }
 

@@ -1,7 +1,5 @@
 package hu.nemi.abcstore.core
 
-import kotlin.properties.Delegates
-
 /***
  * Contract for store implementations to dispatch state mutation and state change
  */
@@ -86,60 +84,91 @@ private class RootStateStore<R : Any>(initialState: R,
                                       private val lock: Lock,
                                       private val updateScheduler: Scheduler,
                                       private val stateChangeScheduler: Scheduler) {
-    private var state by Delegates.observable(StateNode(initialState)) { _, oldState, newState ->
-        if (newState != oldState) {
-            val subscriptions = this.subscriptions
-            stateChangeScheduler {
-                subscriptions.forEach { subscriber -> subscriber(newState) }
-            }
-        }
-    }
-    @Volatile
-    private var subscriptions = emptySet<(StateNode<R>) -> Unit>()
-    @Volatile
-    private var isDispatching = false
+    @Volatile private var state = StateNode<R, R>(initialState)
+    @Volatile private var isDispatching = false
 
-    fun dispatch(action: (StateNode<R>) -> StateNode<R>) = updateScheduler {
+    fun dispatch(action: (StateNode<R, R>) -> StateNode<R, R>) = updateScheduler {
         lock {
             if (isDispatching) throw IllegalStateException("an action is already being dispatched")
 
             isDispatching = true
-            state = try {
-                action(state)
+            try {
+                setState(action(state))
             } finally {
                 isDispatching = false
             }
         }
     }
 
-    fun withState(f: StateScope<StateNode<R>>.() -> Unit) = updateScheduler {
+    fun withState(f: StateScope<StateNode<R, R>>.() -> Unit) = updateScheduler {
         lock {
-            state = object : StateScope<StateNode<R>> {
-                override var value: StateNode<R> = state
-                    get() = lock {
-                        field
-                    }
-                    set(value) = lock {
-                        field = value
-
-                    }
-            }.apply(f).value
+            setState(StateScopeImpl(lock, state).apply(f).value)
         }
     }
 
-    fun subscribe(subscriber: (StateNode<R>) -> Unit): Subscription {
-        // schedule subscription
+    fun <S : Any> subscribe(block: (S) -> Unit, node: StateNodeRef<R, S>): Subscription {
+        val subscriber = Subscriber(block, node)
+
         updateScheduler {
-            // add subscription and invoke subscriber
-            lock {
-                subscriptions += subscriber
+            val state = node.subscribers(state) { subscribers ->
+                subscribers + subscriber
+            }
+            this.state = state
+
+            stateChangeScheduler {
                 subscriber(state)
             }
         }
 
-        // returned subscription with schedule subscribe which will remove the subscriber from the list of subscribers
         return Subscription {
-            updateScheduler { subscriptions -= subscriber }
+            this.state = node.subscribers(this.state) { subscribers ->
+                subscribers - subscriber
+            }
+        }
+    }
+
+    private fun dispatchStateChanged(state: StateNode<R, R>, node: StateNode<*, R>) {
+        node.subscribers.forEach { onStateChanged -> onStateChanged(state) }
+        node.children.values.forEach { childNode -> dispatchStateChanged(state, childNode) }
+    }
+
+    private fun setState(newState: StateNode<R, R>) {
+        if (state != newState) {
+            state = newState
+            stateChangeScheduler {
+                dispatchStateChanged(newState, newState)
+            }
+        }
+    }
+
+    private class StateScopeImpl<R : Any>(private val lock: Lock, initialValue: R) : StateScope<R> {
+        override var value: R = initialValue
+            get() = lock {
+                field
+            }
+            set(value) = lock {
+                field = value
+            }
+    }
+
+    private class Subscriber<R : Any, S : Any>(private val block: (S) -> Unit, private val nodeRef: StateNodeRef<R, S>) : (StateNode<R, R>) -> Unit {
+        override fun invoke(state: StateNode<R, R>) {
+            block(nodeRef.value(state))
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as Subscriber<*, *>
+
+            if (block != other.block) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            return block.hashCode()
         }
     }
 }
@@ -170,12 +199,7 @@ private class DefaultStateStore<R : Any, S : Any>(private val rootStateStore: Ro
     override fun <A : Any> withReducer(reducer: (S, A) -> S): Store<S, A> =
             ReducerStore(this, reducer)
 
-    override fun subscribe(block: (S) -> Unit): Subscription = rootStateStore.subscribe(Subscriber(block, node.value))
-
-    private data class Subscriber<in R : Any, M : Any>(private val block: (M) -> Unit,
-                                                       private val state: Lens<StateNode<R>, M>) : (StateNode<R>) -> Unit {
-        override fun invoke(rootNode: StateNode<R>) = block(state(rootNode))
-    }
+    override fun subscribe(block: (S) -> Unit): Subscription = rootStateStore.subscribe(block, node)
 }
 
 private class ReducerStore<S : Any, in A : Any>(private val store: Store<S, (S) -> S>,

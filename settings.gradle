@@ -1,2 +1,2 @@
-include ':abcstore-core', ':abcstore-android'
+include ':abcstore-core', ':abcstore-android', ':sampletodo'
 

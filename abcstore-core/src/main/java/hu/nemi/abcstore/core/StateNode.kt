@@ -1,9 +1,10 @@
 package hu.nemi.abcstore.core
 
-internal data class StateNode<out V : Any>(val value: V, val children: Map<Any, StateNode<*>> = emptyMap())
+internal data class StateNode<V : Any, R : Any>(val value: V, val subscribers: Set<(oldState: StateNode<R, R>) -> Unit> = emptySet(), val children: Map<Any, StateNode<*, R>> = emptyMap())
 
 internal interface StateNodeRef<R : Any, V : Any> {
-    val value: Lens<StateNode<R>, V>
+    val value: Lens<StateNode<R, R>, V>
+    val subscribers: Lens<StateNode<R, R>, Set<(StateNode<R, R>) -> Unit>>
 
     operator fun <T : Any> plus(lens: Lens<V, T>): StateNodeRef<R, T>
 
@@ -14,23 +15,32 @@ internal interface StateNodeRef<R : Any, V : Any> {
     }
 }
 
-private data class DefaultStateNodeRef<R : Any, V : Any>(val nodeLens: Lens<StateNode<R>, StateNode<V>>) : StateNodeRef<R, V> {
+private data class DefaultStateNodeRef<R : Any, V : Any>(val nodeLens: Lens<StateNode<R, R>, StateNode<V, R>>) : StateNodeRef<R, V> {
 
-    override val value: Lens<StateNode<R>, V> = nodeLens + Lens(
+    override val value: Lens<StateNode<R, R>, V> = nodeLens + Lens(
             get = { it.value },
             set = { value -> { node -> node.copy(value = value) } }
+    )
+
+    override val subscribers: Lens<StateNode<R, R>, Set<(StateNode<R, R>) -> Unit>> = nodeLens + Lens(
+            get = { it.subscribers },
+            set = { subscribers ->
+                { node ->
+                    node.copy(subscribers = subscribers)
+                }
+            }
     )
 
     override fun <C : Any> addChild(key: Any, init: () -> C): StateNodeRef<R, Pair<V, C>> = DefaultStateNodeRef(
             nodeLens + Lens(
                     get = {
-                        val childNode = (it.children[key] as? StateNode<C>)
+                        val childNode = (it.children[key] as? StateNode<C, R>)
                                 ?: StateNode(value = init())
-                        StateNode(value = Pair(first = it.value, second = childNode.value), children = childNode.children)
+                        StateNode(value = Pair(first = it.value, second = childNode.value), children = childNode.children, subscribers = childNode.subscribers)
                     },
                     set = { childNode ->
                         { parentNode ->
-                            parentNode.copy(value = childNode.value.first, children = parentNode.children + (key to StateNode(value = childNode.value.second, children = childNode.children)))
+                            parentNode.copy(value = childNode.value.first, children = parentNode.children + (key to StateNode(value = childNode.value.second, children = childNode.children, subscribers = childNode.subscribers)))
                         }
                     }
             )
@@ -38,8 +48,8 @@ private data class DefaultStateNodeRef<R : Any, V : Any>(val nodeLens: Lens<Stat
 
     override fun <T : Any> plus(lens: Lens<V, T>): StateNodeRef<R, T> = DefaultStateNodeRef(
             nodeLens + Lens(
-                    get = { node: StateNode<V> -> StateNode(value = lens(node.value), children = node.children) },
-                    set = { mappedNode: StateNode<T> -> { node: StateNode<V> -> node.copy(value = lens(node.value, mappedNode.value), children = mappedNode.children) } }
+                    get = { node: StateNode<V, R> -> StateNode(value = lens(node.value), children = node.children, subscribers = node.subscribers) },
+                    set = { mappedNode: StateNode<T, R> -> { node: StateNode<V, R> -> node.copy(value = lens(node.value, mappedNode.value), children = mappedNode.children, subscribers = mappedNode.subscribers) } }
             )
     )
 }
